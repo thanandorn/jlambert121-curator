@@ -58,7 +58,7 @@ class curator (
   $logformat            = $::curator::params::logformat,
   $manage_repo          = $::curator::params::manage_repo,
   $repo_version         = $::curator::params::repo_version,
-  $schudule_type        = $::curator::params::schedule_type,
+  $schedule_type        = $::curator::params::schedule_type,
 ) inherits curator::params {
 
   if ( $ensure != 'latest' or $ensure != 'absent' ) {
