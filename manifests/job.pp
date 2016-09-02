@@ -58,11 +58,18 @@ define curator::job (
   # Snapshot options
   $repository            = undef,
 
+  # Schedule type
+  $schedule_type         = $::curator::schedule_type,
+
   # Cron params
   $cron_weekday          = '*',
   $cron_hour             = 1,
   $cron_minute           = 10,
-){
+
+  # Systemd timer params
+  $systemd_timer         = '*-*-* 01:10:00',
+
+) {
 
   include ::curator
 
@@ -283,12 +290,61 @@ define curator::job (
   $index_options = join(delete_undef_values([$_prefix, $_suffix, $_regex, $_time_unit, $_exclude, $_index, $_snapshot, $_older_than, $_newer_than, $_timestring]), ' ')
   $options = join(delete_undef_values([$mo_string, $ssl_string, $ssl_certificate, $ssl_no_validate, $auth_string]), ' ')
 
-  cron { "curator_${name}":
-    ensure  => $ensure,
-    command => "${bin_file} --logfile ${logfile} --loglevel ${log_level} --logformat ${logformat} ${options} --host ${host} --port ${port} ${exec} ${index_options} >/dev/null",
-    hour    => $cron_hour,
-    minute  => $cron_minute,
-    weekday => $cron_weekday,
-  }
+  validate_re($schedule_type, '^(cron|systemd)$')
+  if $schedule_type == 'cron' {
 
+    # Cron Configuration
+    cron { "curator_${name}":
+      ensure  => $ensure,
+      command => "${bin_file} --logfile ${logfile} --loglevel ${log_level} --logformat ${logformat} ${options} --host ${host} --port ${port} ${exec} ${index_options} >/dev/null",
+      hour    => $cron_hour,
+      minute  => $cron_minute,
+      weekday => $cron_weekday,
+    }
+
+  } elsif $schedule_type == 'systemd' {
+
+    $curator_command = "${bin_file} --loglevel ${log_level} --logformat ${logformat} ${options} --host ${host} --port ${port} ${exec} ${index_options}"
+
+    # Systemd Configuration
+    file { "/lib/systemd/system/curator_${name}.service":
+      ensure  => $ensure,
+      owner   => 'root',
+      group   => 'root',
+      mode    => '0644',
+      content => template('curator/systemd/curator.service.erb'),
+      notify  => Exec["curator_${name}-daemon-reload"],
+    }
+
+    file { "/lib/systemd/system/curator_${name}.timer":
+      ensure  => $ensure,
+      owner   => 'root',
+      group   => 'root',
+      mode    => '0644',
+      content => template('curator/systemd/curator.timer.erb'),
+      notify  => Exec["curator_${name}-daemon-reload"],
+    }
+
+    exec { "curator_${name}-daemon-reload":
+      command     => 'systemctl daemon-reload',
+      path        => ['/usr/bin','/bin','/sbin'],
+      refreshonly => true,
+    }
+
+    $service_ensure = $ensure ? {
+      /present/ => 'running',
+      /absent/  => 'stopped',
+    }
+
+    $service_enable = $ensure ? {
+      /present/ => true,
+      /absent/  => false
+    }
+
+    service { "curator_${name}.timer":
+      ensure    => $service_ensure,
+      enable    => $service_enable,
+      subscribe => Exec["curator_${name}-daemon-reload"],
+    }
+  }
 }

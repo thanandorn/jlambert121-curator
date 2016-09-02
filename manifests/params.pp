@@ -23,4 +23,5 @@ class curator::params {
   $logfile              = '/var/log/curator.log'
   $log_level            = 'INFO'
   $logformat            = 'default'
+  $schedule_type        = 'cron'
 }

@@ -1,0 +1,9 @@
+[Unit]
+Description=Elasticsearch Curator <%= @name %> Service
+
+[Service]
+Type=simple
+ExecStart=<%= @curator_command %>
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=Elasticsearch Curator <%= @name %> Timer
+
+[Timer]
+OnCalendar=<%= @systemd_timer %>
+Unit=curator_<%= @name %>.service
+
+[Install]
+WantedBy=multi-user.target
